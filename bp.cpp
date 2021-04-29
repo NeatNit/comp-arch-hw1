@@ -5,6 +5,8 @@
 #include <vector>
 #include <limits>
 
+#include <iostream> // FOR DEBUGGING
+
 enum FSM : unsigned {SNT=0, WNT=1, WT=2, ST=3};
 
 FSM incrFSM(FSM prev) {
@@ -45,7 +47,7 @@ class BranchPredictor
     unsigned btbSize;
     unsigned historySize;
     unsigned tagSize;
-    unsigned fsmState;
+    FSM fsmDefault;
     bool isGlobalHist;
     bool isGlobalTable;
     ShareType sharedType;
@@ -106,7 +108,7 @@ public:
                     bool isGlobalHist, bool isGlobalTable, int isShared) :
 
                     // initialize parameters
-                    btbSize(btbSize), historySize(historySize), tagSize(tagSize), fsmState(fsmState),
+                    btbSize(btbSize), historySize(historySize), tagSize(tagSize), fsmDefault(fsmState),
                     isGlobalHist(isGlobalHist), isGlobalTable(isGlobalTable), sharedType(static_cast<ShareType>(isShared)),
 
                     // initialize tags and valid vectors
@@ -119,7 +121,7 @@ public:
                     // initialize FSM (bimodal) vector -- each element contains a vector of
                     // one FSM per history
                     // again, if the table is global, there will be just one set of FSMs
-                    fsms(isGlobalTable ? 1 : btbSize, std::vector<FSM>(twopow(historySize), static_cast<FSM>(fsmState)))
+                    fsms(isGlobalTable ? 1 : btbSize, std::vector<FSM>(twopow(historySize), fsmDefault))
     {
         // initialize the stats
         stats.flush_num = 0;
@@ -180,7 +182,7 @@ public:
             valid[i] = true;
             tags[i] = parts.tag;
             if (!isGlobalHist) histories[i] = 0;
-            if (!isGlobalTable) fsms[i].assign(twopow(historySize), static_cast<FSM>(fsmState));
+            if (!isGlobalTable) fsms[i].assign(twopow(historySize), fsmDefault);
         }
 
         // update target address (even for old entries it might change)
@@ -191,6 +193,14 @@ public:
         uint8_t hist_index = isGlobalHist ? 0 : i;
         uint8_t hist = histories[hist_index];
         uint8_t fsm_sub_index = hist ^ parts.share_bits;
+
+        cout << "fsms.size(): " << fsms.size()
+            << "; fsm_index: " << fsm_index
+            << "; fsms[fsm_index].size(): " << fsms[fsm_index].size()
+            << "; fsm_sub_index: " << fsm_sub_index
+            << "; fsms[fsm_index][fsm_sub_index]: " << fsms[fsm_index][fsm_sub_index]
+            << std::endl;
+
         if (taken) {
             fsms[fsm_index][fsm_sub_index] = incrFSM(fsms[fsm_index][fsm_sub_index]);
         } else {
