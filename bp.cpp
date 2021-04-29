@@ -194,7 +194,7 @@ public:
         uint8_t hist = histories[hist_index];
         uint8_t fsm_sub_index = hist ^ parts.share_bits;
 
-        cout << "fsms.size(): " << fsms.size()
+        std::cout << "fsms.size(): " << fsms.size()
             << "; fsm_index: " << fsm_index
             << "; fsms[fsm_index].size(): " << fsms[fsm_index].size()
             << "; fsm_sub_index: " << fsm_sub_index
