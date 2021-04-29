@@ -107,7 +107,7 @@ public:
 
                     // initialize parameters
                     btbSize(btbSize), historySize(historySize), tagSize(tagSize), fsmState(fsmState),
-                    isGlobalHist(isGlobalHist), isGlobalTable(isGlobalTable), sharedType(isShared),
+                    isGlobalHist(isGlobalHist), isGlobalTable(isGlobalTable), sharedType(static_cast<ShareType>(isShared)),
 
                     // initialize tags and valid vectors
                     valid(btbSize, 0), tags(btbSize), targets(btbSize),
