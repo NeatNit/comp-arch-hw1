@@ -7,6 +7,16 @@
 
 enum FSM : unsigned {SNT=0, WNT=1, WT=2, ST=3};
 
+FSM incrFSM(FSM prev) {
+    if (prev == FSM.ST) return FSM.ST;
+    return prev + 1;
+}
+
+FSM decrFSM(FSM prev) {
+    if (prev == FSM.SNT) return FSM.SNT;
+    return prev - 1;
+}
+
 enum ShareType : int {not_using_share=0, using_share_lsb=1, using_share_mid=2};
 
 // log base 2 of an unsigned integer, rounded down
@@ -82,11 +92,11 @@ class BranchPredictor
 
         // next log2(btbSize) bits are the list index
         uint32_t li_length = log2(btbSize);
-        parts.list_index = pc | lsbmask(li_length);
+        parts.list_index = pc & lsbmask(li_length);
         pc >>= li_length;
 
         // next tagSize bits are the tag
-        parts.tag = pc | lsbmask(tagSize);
+        parts.tag = pc & lsbmask(tagSize);
 
         return parts;
     }
@@ -115,12 +125,12 @@ public:
         stats.flush_num = 0;
         stats.br_num = 0;
 
-        // calculate the predictor size - we can do this now!
-        stats.size =
-            valid.size()                        // valid bits
+        // calculate the predictor size
+        stats.size = 1 * valid.size()           // valid bits
             + tagSize * tags.size()             // tag bits
+            + 30 * targets.size()               // targets bits (30 bits for target address, lower 2 bits assumed to be 0)
             + historySize * histories.size()    // history bits
-            + 2 * fsms.size() * fsms[0].size();   // FSM bits
+            + 2 * fsms.size() * fsms[0].size(); // FSM bits
 
 
     }
@@ -128,7 +138,6 @@ public:
 
     bool predict(uint32_t pc, uint32_t *dst) {
         PCParts parts = SplitPC(pc);
-
         uint8_t i = parts.list_index; // convenience handle
 
         // first of all - do we even have this PC in our table?
@@ -156,7 +165,41 @@ public:
     }
 
     void update(uint32_t pc, uint32_t targetPc, bool taken, uint32_t pred_dst) {
-        return;
+        PCParts parts = SplitPC(pc);
+        uint8_t i = parts.list_index; // convenience handle
+
+        // Update stats
+        ++stats.br_num;
+        bool prediction_was_wrong = (!taken && pred_dst != pc+4) || (taken && pred_dst != targetPc);
+        if (prediction_was_wrong) ++stats.flush_num;
+
+        // find out if this is an existing entry or new/replacing
+        bool isOld = valid[i] && (tags[i] == parts.tag);
+
+        // if it's old, initialize the entry in the table
+        if (!isOld) {
+            valid[i] = true;
+            tags[i] = parts.tag;
+            if (!isGlobalHist) histories[i] = 0;
+            if (!isGlobalTable) fsms[i].assign(twopow(historySize), fsmState);
+        }
+
+        // update target address (even for old entries it might change)
+        targets[i] = targetPc;
+
+        // update fsm
+        uint8_t fsm_index = isGlobalTable ? 0 : i;
+        uint8_t hist_index = isGlobalHist ? 0 : i;
+        uint8_t hist = histories[hist_index];
+        uint8_t fsm_sub_index = hist ^ parts.share_bits;
+        if (taken) {
+            fsms[fsm_index][fsm_sub_index] = incrFSM(fsms[fsm_index][fsm_sub_index]);
+        } else {
+            fsms[fsm_index][fsm_sub_index] = decrFSM(fsms[fsm_index][fsm_sub_index]);
+        }
+
+        // update history
+        histories[hist_index] = ((hist << 1) | taken) & lsbmask(historySize);
     }
 
     void GetStats(SIM_stats *curStats) {
