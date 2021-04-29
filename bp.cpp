@@ -41,11 +41,12 @@ class BranchPredictor
     ShareType sharedType;
 
     // vectors of tags and valid bit
-    std::vector<uint32_t> tags;
     std::vector<bool> valid;
+    std::vector<uint32_t> tags;
+    std::vector<uint32_t> targets;
 
     std::vector<uint8_t> histories;
-    std::vector<std::vector<FSM>> fsm;
+    std::vector<std::vector<FSM>> fsms;
 
     // private struct to hold the separated parts of the program counter
     struct PCParts
@@ -60,16 +61,20 @@ class BranchPredictor
         PCParts parts;
 
         // first get the share bits, before modifying pc
-        switch(sharedType) {
-            case ShareType.not_using_share:
-                parts.share_bits = 0;
-                break;
-            case ShareType.using_share_lsb:
-                parts.share_bits = (pc >> 2) | lsbmask(historySize);
-                break;
-            case ShareType.using_share_mid:
-                parts.share_bits = (pc >> 16) | lsbmask(historySize);
-                break;
+        if (isGlobalHist) {
+            switch(sharedType) {
+                case ShareType.not_using_share:
+                    parts.share_bits = 0;
+                    break;
+                case ShareType.using_share_lsb:
+                    parts.share_bits = (pc >> 2) | lsbmask(historySize);
+                    break;
+                case ShareType.using_share_mid:
+                    parts.share_bits = (pc >> 16) | lsbmask(historySize);
+                    break;
+            }
+        } else {
+            parts.share_bits = 0;
         }
 
         // ignore first 2 bits (4-byte aligned)
@@ -95,16 +100,16 @@ public:
                     isGlobalHist(isGlobalHist), isGlobalTable(isGlobalTable), sharedType(isShared),
 
                     // initialize tags and valid vectors
-                    tags(btbSize), valid(btbSize, 0),
+                    valid(btbSize, 0), tags(btbSize), targets(btbSize),
 
                     // initialize histories vector -- if global history, just one element,
                     // otherwise it's the size of the BTB
                     histories(isGlobalHist ? 1 : btbSize),
 
                     // initialize FSM (bimodal) vector -- each element contains a vector of
-                    // one FSMs per history
+                    // one FSM per history
                     // again, if the table is global, there will be just one set of FSMs
-                    fsm(isGlobalTable ? 1 : btbSize, std::vector<FSM>(twopow(historySize), fsmState))
+                    fsms(isGlobalTable ? 1 : btbSize, std::vector<FSM>(twopow(historySize), fsmState))
     {
         // initialize the stats
         stats.flush_num = 0;
@@ -115,7 +120,7 @@ public:
             valid.size()                        // valid bits
             + tagSize * tags.size()             // tag bits
             + historySize * histories.size()    // history bits
-            + 2 * fsm.size() * fsm[0].size();   // FSM bits
+            + 2 * fsms.size() * fsms[0].size();   // FSM bits
 
 
     }
@@ -124,8 +129,30 @@ public:
     bool predict(uint32_t pc, uint32_t *dst) {
         PCParts parts = SplitPC(pc);
 
+        uint8_t i = parts.list_index; // convenience handle
 
-        return false;
+        // first of all - do we even have this PC in our table?
+        if (!valid[i] || tags[i] != parts.tag) {
+            *dst = pc + 4;
+            return false;
+        }
+
+        // get our history
+        uint8_t hist = histories[isGlobalHist ? 0 : i];
+        // XOR it with LShare/GShare
+        hist ^= parts.share_bits;
+
+        // use it as index for the FSM
+        FSM state = fsms[isGlobalTable ? 0 : i][hist];
+
+        // use the state of the FSM to predict outcome
+        if (state == FSM.WT || state == FSM.ST) {
+            *dst = targets[i];
+            return true;
+        } else {
+            *dst = pc + 4;
+            return false;
+        }
     }
 
     void update(uint32_t pc, uint32_t targetPc, bool taken, uint32_t pred_dst) {
