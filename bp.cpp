@@ -5,15 +5,28 @@
 #include <vector>
 #include <limits>
 
-enum FSM : unsigned char {SNT=0, WNT=1, WT=2, ST=3};
+enum FSM : unsigned {SNT=0, WNT=1, WT=2, ST=3};
+
+enum ShareType : int {not_using_share=0, using_share_lsb=1, using_share_mid=2};
 
 // log base 2 of an unsigned integer, rounded down
 // note: there are assembly instructions to do this but inline assembly sucks...
-unsigned log2(unsigned x) {
+inline unsigned log2(unsigned x) {
     unsigned l = 0;
     if (x == 0) return std::numeric_limits<unsigned>::max();
     while(x >>= 1) ++l;
     return l;
+}
+
+// returns 2^x
+inline uint32_t twopow(uint32_t x) {
+    return 1 << x;
+}
+
+// create a bitmask where the last x bits are 1
+// for example: lsbmask(5) produces 00...00011111 in binary
+inline uint32_t lsbmask(uint32_t x) {
+    return (1 << x) - 1;
 }
 
 class BranchPredictor
@@ -25,43 +38,93 @@ class BranchPredictor
     unsigned fsmState;
     bool isGlobalHist;
     bool isGlobalTable;
-    int Shared;
+    ShareType sharedType;
 
     // vectors of tags and valid bit
-    std::vector<unsigned> tag;
+    std::vector<uint32_t> tags;
     std::vector<bool> valid;
 
-    std::vector<unsigned char> history;
+    std::vector<uint8_t> histories;
     std::vector<std::vector<FSM>> fsm;
+
+    // private struct to hold the separated parts of the program counter
+    struct PCParts
+    {
+        uint8_t list_index;
+        uint32_t tag;
+        uint8_t share_bits;
+    };
+
+    // Split a given program counter into its different bitwise parts
+    PCParts SplitPC(uint32_t pc) {
+        PCParts parts;
+
+        // first get the share bits, before modifying pc
+        switch(sharedType) {
+            case ShareType.not_using_share:
+                parts.share_bits = 0;
+                break;
+            case ShareType.using_share_lsb:
+                parts.share_bits = (pc >> 2) | lsbmask(historySize);
+                break;
+            case ShareType.using_share_mid:
+                parts.share_bits = (pc >> 16) | lsbmask(historySize);
+                break;
+        }
+
+        // ignore first 2 bits (4-byte aligned)
+        pc >>= 2;
+
+        // next log2(btbSize) bits are the list index
+        uint32_t li_length = log2(btbSize);
+        parts.list_index = pc | lsbmask(li_length);
+        pc >>= li_length;
+
+        // next tagSize bits are the tag
+        parts.tag = pc | lsbmask(tagSize);
+
+        return parts;
+    }
+
 public:
     BranchPredictor(unsigned btbSize, unsigned historySize, unsigned tagSize, unsigned fsmState,
                     bool isGlobalHist, bool isGlobalTable, int isShared) :
 
                     // initialize parameters
                     btbSize(btbSize), historySize(historySize), tagSize(tagSize), fsmState(fsmState),
-                    isGlobalHist(isGlobalHist), isGlobalTable(isGlobalTable), isShared(Shared),
+                    isGlobalHist(isGlobalHist), isGlobalTable(isGlobalTable), sharedType(isShared),
 
-                    // initialize tag and valid vectors
-                    tag(btbSize), valid(btbSize, 0),
+                    // initialize tags and valid vectors
+                    tags(btbSize), valid(btbSize, 0),
 
-                    // initialize history vector -- if global history, just one element,
+                    // initialize histories vector -- if global history, just one element,
                     // otherwise it's the size of the BTB
-                    history(isGlobalHist ? 1 : btbSize),
+                    histories(isGlobalHist ? 1 : btbSize),
 
                     // initialize FSM (bimodal) vector -- each element contains a vector of
                     // one FSMs per history
                     // again, if the table is global, there will be just one set of FSMs
-                    fsm(isGlobalTable ? 1 : btbSize, std::vector<FSM>(log2(historySize), fsmState))
+                    fsm(isGlobalTable ? 1 : btbSize, std::vector<FSM>(twopow(historySize), fsmState))
     {
+        // initialize the stats
         stats.flush_num = 0;
         stats.br_num = 0;
-        stats.size = 0; // actually we can calculate size here
+
+        // calculate the predictor size - we can do this now!
+        stats.size =
+            valid.size()                        // valid bits
+            + tagSize * tags.size()             // tag bits
+            + historySize * histories.size()    // history bits
+            + 2 * fsm.size() * fsm[0].size();   // FSM bits
 
 
     }
     ~BranchPredictor();
 
     bool predict(uint32_t pc, uint32_t *dst) {
+        PCParts parts = SplitPC(pc);
+
+
         return false;
     }
 
@@ -77,9 +140,9 @@ public:
 BranchPredictor *pred;
 
 int BP_init(unsigned btbSize, unsigned historySize, unsigned tagSize, unsigned fsmState,
-			bool isGlobalHist, bool isGlobalTable, int Shared){
+			bool isGlobalHist, bool isGlobalTable, int isShared){
     try {
-        *pred = new BranchPredictor(btbSize, historySize, tagSize, fsmState, isGlobalHist, isGlobalTable, Shared);
+        *pred = new BranchPredictor(btbSize, historySize, tagSize, fsmState, isGlobalHist, isGlobalTable, isShared);
         return 0;
     } catch (...) {
         return -1;
