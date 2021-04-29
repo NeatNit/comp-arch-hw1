@@ -8,12 +8,12 @@
 enum FSM : unsigned {SNT=0, WNT=1, WT=2, ST=3};
 
 FSM incrFSM(FSM prev) {
-    if (prev == FSM.ST) return FSM.ST;
+    if (prev == ST) return ST;
     return prev + 1;
 }
 
 FSM decrFSM(FSM prev) {
-    if (prev == FSM.SNT) return FSM.SNT;
+    if (prev == SNT) return SNT;
     return prev - 1;
 }
 
@@ -155,7 +155,7 @@ public:
         FSM state = fsms[isGlobalTable ? 0 : i][hist];
 
         // use the state of the FSM to predict outcome
-        if (state == FSM.WT || state == FSM.ST) {
+        if (state == WT || state == ST) {
             *dst = targets[i];
             return true;
         } else {
