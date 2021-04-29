@@ -9,12 +9,12 @@ enum FSM : unsigned {SNT=0, WNT=1, WT=2, ST=3};
 
 FSM incrFSM(FSM prev) {
     if (prev == ST) return ST;
-    return prev + 1;
+    return static_cast<FSM>(prev + 1);
 }
 
 FSM decrFSM(FSM prev) {
     if (prev == SNT) return SNT;
-    return prev - 1;
+    return static_cast<FSM>(prev - 1);
 }
 
 enum ShareType : int {not_using_share=0, using_share_lsb=1, using_share_mid=2};
@@ -73,13 +73,13 @@ class BranchPredictor
         // first get the share bits, before modifying pc
         if (isGlobalHist) {
             switch(sharedType) {
-                case ShareType.not_using_share:
+                case not_using_share:
                     parts.share_bits = 0;
                     break;
-                case ShareType.using_share_lsb:
+                case using_share_lsb:
                     parts.share_bits = (pc >> 2) | lsbmask(historySize);
                     break;
-                case ShareType.using_share_mid:
+                case using_share_mid:
                     parts.share_bits = (pc >> 16) | lsbmask(historySize);
                     break;
             }
@@ -119,7 +119,7 @@ public:
                     // initialize FSM (bimodal) vector -- each element contains a vector of
                     // one FSM per history
                     // again, if the table is global, there will be just one set of FSMs
-                    fsms(isGlobalTable ? 1 : btbSize, std::vector<FSM>(twopow(historySize), fsmState))
+                    fsms(isGlobalTable ? 1 : btbSize, std::vector<FSM>(twopow(historySize), static_cast<FSM>(fsmState)))
     {
         // initialize the stats
         stats.flush_num = 0;
@@ -181,7 +181,7 @@ public:
             valid[i] = true;
             tags[i] = parts.tag;
             if (!isGlobalHist) histories[i] = 0;
-            if (!isGlobalTable) fsms[i].assign(twopow(historySize), fsmState);
+            if (!isGlobalTable) fsms[i].assign(twopow(historySize), static_cast<FSM>(fsmState));
         }
 
         // update target address (even for old entries it might change)
@@ -212,7 +212,7 @@ BranchPredictor *pred;
 int BP_init(unsigned btbSize, unsigned historySize, unsigned tagSize, unsigned fsmState,
 			bool isGlobalHist, bool isGlobalTable, int isShared){
     try {
-        *pred = new BranchPredictor(btbSize, historySize, tagSize, fsmState, isGlobalHist, isGlobalTable, isShared);
+        pred = new BranchPredictor(btbSize, historySize, tagSize, fsmState, isGlobalHist, isGlobalTable, isShared);
         return 0;
     } catch (...) {
         return -1;
