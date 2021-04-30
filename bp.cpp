@@ -114,7 +114,7 @@ public:
 
                     // initialize histories vector -- if global history, just one element,
                     // otherwise it's the size of the BTB
-                    histories(isGlobalHist ? 1 : btbSize),
+                    histories(isGlobalHist ? 1 : btbSize, 0),
 
                     // initialize FSM (bimodal) vector -- each element contains a vector of
                     // one FSM per history
@@ -126,13 +126,11 @@ public:
         stats.br_num = 0;
 
         // calculate the predictor size
-        stats.size = //1 * valid.size()           // valid bits
-            /*+*/ tagSize * tags.size()             // tag bits
+        stats.size = 1 * valid.size()           // valid bits
+            + tagSize * tags.size()             // tag bits
             + 30 * targets.size()               // targets bits (30 bits for target address, lower 2 bits assumed to be 0)
             + historySize * histories.size()    // history bits
             + 2 * fsms.size() * fsms[0].size(); // FSM bits
-
-
     }
 
     bool predict(uint32_t pc, uint32_t *dst) {
@@ -175,7 +173,7 @@ public:
         // find out if this is an existing entry or new/replacing
         bool isOld = valid[i] && (tags[i] == parts.tag);
 
-        // if it's old, initialize the entry in the table
+        // if it's new, initialize the entry in the table
         if (!isOld) {
             valid[i] = true;
             tags[i] = parts.tag;
