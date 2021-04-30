@@ -126,8 +126,8 @@ public:
         stats.br_num = 0;
 
         // calculate the predictor size
-        stats.size = 1 * valid.size()           // valid bits
-            + tagSize * tags.size()             // tag bits
+        stats.size = //1 * valid.size()           // valid bits
+            /*+*/ tagSize * tags.size()             // tag bits
             + 30 * targets.size()               // targets bits (30 bits for target address, lower 2 bits assumed to be 0)
             + historySize * histories.size()    // history bits
             + 2 * fsms.size() * fsms[0].size(); // FSM bits
