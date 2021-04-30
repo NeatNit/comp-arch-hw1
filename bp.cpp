@@ -50,11 +50,14 @@ class BranchPredictor
     bool isGlobalTable;
     ShareType sharedType;
 
-    // vectors of tags and valid bit
+    // vectors of valid bit, tag and target
     std::vector<bool> valid;
     std::vector<uint32_t> tags;
     std::vector<uint32_t> targets;
 
+    // vectors of history and FSMs
+    // if history is global, then histories is a vector of length 1
+    // if the FSM table is global, then fsms is a vector of length 1
     std::vector<uint8_t> histories;
     std::vector<std::vector<FSM>> fsms;
 
