@@ -72,7 +72,7 @@ class BranchPredictor
     PCParts SplitPC(uint32_t pc) {
         PCParts parts;
 
-        std::cout << "splitting PC" << std::hex << pc
+        std::cout << "splitting PC 0x" << std::hex << pc
             << "; initial values (junk): " << static_cast<int>(parts.list_index) << " " << parts.tag << " " << static_cast<int>(parts.share_bits)
             << std::endl;
 
@@ -86,11 +86,12 @@ class BranchPredictor
                     break;
                 case using_share_lsb:
                     std::cout << "using_share_lsb";
-                    parts.share_bits = (pc >> 2) | lsbmask(historySize);
+                    parts.share_bits = (pc >> 2) & lsbmask(historySize);
                     break;
                 case using_share_mid:
                     std::cout << "using_share_mid";
-                    parts.share_bits = (pc >> 16) | lsbmask(historySize);
+                    std::cout << " " << (pc >> 16) << " " << ((pc >> 16) & lsbmask(historySize));
+                    parts.share_bits = (pc >> 16) & lsbmask(historySize);
                     break;
             }
             std::cout << std::endl;
