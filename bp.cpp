@@ -197,7 +197,7 @@ public:
         std::cout << "hist: " << static_cast<int>(hist)
             << "; share_bits: " << static_cast<int>(parts.share_bits)
             << "; fsm_sub_index: " << static_cast<int>(fsm_sub_index)
-            << std:endl;
+            << std::endl;
 
         std::cout << "fsms.size(): " << fsms.size()
             << "; fsm_index: " << static_cast<int>(fsm_index)
