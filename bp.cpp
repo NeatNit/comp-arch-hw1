@@ -108,7 +108,7 @@ public:
                     bool isGlobalHist, bool isGlobalTable, int isShared) :
 
                     // initialize parameters
-                    btbSize(btbSize), historySize(historySize), tagSize(tagSize), fsmDefault(fsmState),
+                    btbSize(btbSize), historySize(historySize), tagSize(tagSize), fsmDefault(static_cast<FSM>(fsmState)),
                     isGlobalHist(isGlobalHist), isGlobalTable(isGlobalTable), sharedType(static_cast<ShareType>(isShared)),
 
                     // initialize tags and valid vectors
