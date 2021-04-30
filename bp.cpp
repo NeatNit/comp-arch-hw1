@@ -73,7 +73,7 @@ class BranchPredictor
         PCParts parts;
 
         std::cout << "splitting PC" << std::hex << pc
-            << "; initial values (junk): " << parts.list_index << " " << parts.tag << " " << parts.share_bits
+            << "; initial values (junk): " << static_cast<int>(parts.list_index) << " " << parts.tag << " " << static_cast<int>(parts.share_bits)
             << std::endl;
 
         // first get the share bits, before modifying pc
@@ -99,7 +99,7 @@ class BranchPredictor
             parts.share_bits = 0;
         }
 
-        std::cout << "share_bits: " << parts.share_bits << std::endl;
+        std::cout << "share_bits: " << static_cast<int>(parts.share_bits) << std::endl;
 
         // ignore first 2 bits (4-byte aligned)
         pc >>= 2;
