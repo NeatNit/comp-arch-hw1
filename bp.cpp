@@ -5,8 +5,6 @@
 #include <vector>
 #include <limits>
 
-#include <iostream> // FOR DEBUGGING
-
 enum FSM : unsigned {SNT=0, WNT=1, WT=2, ST=3};
 
 FSM incrFSM(FSM prev) {
@@ -72,35 +70,22 @@ class BranchPredictor
     PCParts SplitPC(uint32_t pc) {
         PCParts parts;
 
-        std::cout << "splitting PC 0x" << std::hex << pc
-            << "; initial values (junk): " << static_cast<int>(parts.list_index) << " " << parts.tag << " " << static_cast<int>(parts.share_bits)
-            << std::endl;
-
         // first get the share bits, before modifying pc
         if (isGlobalHist) {
-            std::cout << "Global history, sharedType=" << sharedType << " ";
             switch(sharedType) {
                 case not_using_share:
-                    std::cout << "not_using_share";
                     parts.share_bits = 0;
                     break;
                 case using_share_lsb:
-                    std::cout << "using_share_lsb";
                     parts.share_bits = (pc >> 2) & lsbmask(historySize);
                     break;
                 case using_share_mid:
-                    std::cout << "using_share_mid";
-                    std::cout << " " << (pc >> 16) << " " << ((pc >> 16) & lsbmask(historySize));
                     parts.share_bits = (pc >> 16) & lsbmask(historySize);
                     break;
             }
-            std::cout << std::endl;
         } else {
-            std::cout << "Local history, sharedType=" << sharedType << " but no sharing" << std::endl;
             parts.share_bits = 0;
         }
-
-        std::cout << "share_bits: " << static_cast<int>(parts.share_bits) << std::endl;
 
         // ignore first 2 bits (4-byte aligned)
         pc >>= 2;
@@ -206,18 +191,6 @@ public:
         uint8_t hist_index = isGlobalHist ? 0 : i;
         uint8_t hist = histories[hist_index];
         uint8_t fsm_sub_index = hist ^ parts.share_bits;
-
-        // std::cout << "hist: " << static_cast<int>(hist)
-        //     << "; share_bits: " << static_cast<int>(parts.share_bits)
-        //     << "; fsm_sub_index: " << static_cast<int>(fsm_sub_index)
-        //     << std::endl;
-
-        // std::cout << "fsms.size(): " << fsms.size()
-        //     << "; fsm_index: " << static_cast<int>(fsm_index)
-        //     << "; fsms[fsm_index].size(): " << fsms[fsm_index].size()
-        //     << "; fsm_sub_index: " << static_cast<int>(fsm_sub_index)
-        //     << "; fsms[fsm_index][fsm_sub_index]: " << fsms[fsm_index][fsm_sub_index]
-        //     << std::endl;
 
         if (taken) {
             fsms[fsm_index][fsm_sub_index] = incrFSM(fsms[fsm_index][fsm_sub_index]);
